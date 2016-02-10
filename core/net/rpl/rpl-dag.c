@@ -69,6 +69,8 @@ void RPL_CALLBACK_PARENT_SWITCH(rpl_parent_t *old, rpl_parent_t *new);
 extern rpl_of_t RPL_OF;
 static rpl_of_t * const objective_functions[] = {&RPL_OF};
 
+static int global_ip_address_changed = 0;
+
 /*---------------------------------------------------------------------------*/
 /* RPL definitions. */
 
@@ -264,8 +266,9 @@ should_send_dao(rpl_instance_t *instance, rpl_dio_t *dio, rpl_parent_t *p)
     return 0;
   }
   /* check if the new DTSN is more recent */
-  return p == instance->current_dag->preferred_parent &&
-    (lollipop_greater_than(dio->dtsn, p->dtsn));
+  return global_ip_address_changed ||
+    (p == instance->current_dag->preferred_parent &&
+     (lollipop_greater_than(dio->dtsn, p->dtsn)));
 }
 /*---------------------------------------------------------------------------*/
 static int
@@ -432,6 +435,7 @@ check_prefix(rpl_prefix_t *last_prefix, rpl_prefix_t *new_prefix)
       PRINT6ADDR(&ipaddr);
       PRINTF("\n");
       uip_ds6_addr_rm(rep);
+      global_ip_address_changed = 1;
     }
   }
 
@@ -442,6 +446,7 @@ check_prefix(rpl_prefix_t *last_prefix, rpl_prefix_t *new_prefix)
       PRINT6ADDR(&ipaddr);
       PRINTF("\n");
       uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
+      global_ip_address_changed = 1;
     }
   }
 }
@@ -1417,6 +1422,7 @@ rpl_process_dio(uip_ipaddr_t *from, rpl_dio_t *dio)
   /* We don't use route control, so we can have only one official parent. */
   if(dag->joined && p == dag->preferred_parent) {
     if(should_send_dao(instance, dio, p)) {
+      global_ip_address_changed = 0;
       RPL_LOLLIPOP_INCREMENT(instance->dtsn_out);
       rpl_schedule_dao(instance);
     }
